@@ -184,7 +184,16 @@ const Favorites = ({ user, setPage, setSelectedVendorObject, favorites, toggleFa
   const [vendors, setVendors] = useState<Vendor[]>([]);
   
   useEffect(() => {
-    fetch('/api/vendors').then(res => res.json()).then(setVendors);
+    fetch('/api/vendors')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(setVendors)
+      .catch(err => {
+        console.error('Failed to load vendors:', err);
+        setVendors([]);
+      });
   }, []);
 
   const favoriteVendors = vendors.filter(v => favorites.includes(v.id));
@@ -1175,10 +1184,54 @@ const Dashboard = ({ user, setPage, setSelectedVendorObject, favorites, toggleFa
   const [priceRange, setPriceRange] = useState({ min: 0, max: 500000 });
 
   useEffect(() => {
-    fetch('/api/vendors').then(res => res.json()).then(setVendors);
+    fetch('/api/vendors')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        console.log('Vendors loaded:', data);
+        setVendors(data || []);
+      })
+      .catch(err => {
+        console.error('Failed to load vendors:', err);
+        // Fallback: hardcoded vendors
+        setVendors([
+          { id: 1, name: 'Vibrant Visions Photography', category: 'Photographer', rating: 4.9, price: 75000, desc: 'Capturing the essence of Indian weddings with cinematic brilliance.', img: 'https://images.unsplash.com/photo-1537633552985-df8429e8048b?auto=format&fit=crop&q=80&w=600', location: 'Mumbai, Maharashtra', email: 'contact@vibrantvisions.in', reviews: [{ user: 'Ananya S.', rating: 5, comment: 'Absolutely amazing work! They captured every emotion perfectly.' }, { user: 'Rahul M.', rating: 4, comment: 'Great quality, but a bit expensive.' }] },
+          { id: 2, name: 'Spice Route Catering', category: 'Caterer', rating: 4.8, price: 800, desc: 'Authentic Indian flavors and international cuisines for your grand feast.', img: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=600', location: 'Delhi, NCR', email: 'info@spiceroute.com', reviews: [{ user: 'Priya K.', rating: 5, comment: 'The food was the highlight of our wedding. Everyone loved it!' }] },
+          { id: 3, name: 'Royal Mandap Decorators', category: 'Decorator', rating: 4.7, price: 150000, desc: 'Traditional and contemporary wedding decor that feels like royalty.', img: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&q=80&w=600', location: 'Bangalore, Karnataka', email: 'royal@mandap.in', reviews: [{ user: 'Suresh V.', rating: 4, comment: 'Beautiful setup, though they were slightly late for the setup.' }] },
+          { id: 4, name: 'Shringar Bridal Studio', category: 'Makeup Artist', rating: 4.9, price: 25000, desc: 'Expert bridal makeup and styling for the perfect traditional look.', img: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=600', location: 'Chennai, Tamil Nadu', email: 'shringar@beauty.com', reviews: [{ user: 'Meera R.', rating: 5, comment: 'I felt like a queen! Thank you for the amazing makeover.' }] },
+          { id: 5, name: 'Eternal Frames', category: 'Photographer', rating: 4.6, price: 60000, desc: 'Candid photography that captures every emotion of your special day.', img: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=600', location: 'Pune, Maharashtra', email: 'eternal@frames.in', reviews: [] },
+          { id: 6, name: 'The Great Indian Kitchen', category: 'Caterer', rating: 4.5, price: 1200, desc: 'Exquisite multi-cuisine catering for weddings and large events.', img: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=600', location: 'Hyderabad, Telangana', email: 'kitchen@greatindian.com', reviews: [] },
+          { id: 7, name: 'Utsav Event Planners', category: 'Decorator', rating: 4.8, price: 250000, desc: 'Bespoke wedding planning and grand venue decorations.', img: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=600', location: 'Jaipur, Rajasthan', email: 'utsav@events.in', reviews: [] },
+          { id: 8, name: 'Apsara Beauty Lounge', category: 'Makeup Artist', rating: 4.7, price: 35000, desc: 'Luxury bridal makeovers and pre-wedding grooming services.', img: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&q=80&w=600', location: 'Kolkata, West Bengal', email: 'apsara@beauty.in', reviews: [] },
+          { id: 9, name: 'Grand Ballroom Venues', category: 'Venue', rating: 4.8, price: 200000, desc: 'Luxurious banquet halls with traditional and modern architecture in heart of the city.', img: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&q=80&w=600', location: 'Chennai, Tamil Nadu', email: 'info@grandballroom.in', reviews: [{ user: 'Vikram K.', rating: 5, comment: 'Perfect venue with excellent staff support!' }] },
+          { id: 10, name: 'Sunshine Banquet Palace', category: 'Venue', rating: 4.6, price: 150000, desc: 'Traditional North Indian style banquet with world-class facilities and catering services.', img: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=600', location: 'Lucknow, Uttar Pradesh', email: 'info@sunshinebanquet.in', reviews: [] },
+          { id: 11, name: 'Melody Music & DJ Co.', category: 'DJ/Music', rating: 4.9, price: 45000, desc: 'Professional DJs and live musicians for all Indian wedding occasions with classical to modern beats.', img: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600', location: 'Delhi, NCR', email: 'info@melodymusic.in', reviews: [{ user: 'Deepak S.', rating: 5, comment: 'Incredible sound system and amazing playlist management!' }] },
+          { id: 12, name: 'DJ Rajesh Productions', category: 'DJ/Music', rating: 4.7, price: 35000, desc: 'High-energy DJ services with modern light shows perfect for sangeet and reception.', img: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=600', location: 'Bangalore, Karnataka', email: 'rajesh@djproductions.in', reviews: [] },
+          { id: 13, name: 'Maharani Bridal Couture', category: 'Bridal Wear', rating: 4.9, price: 150000, desc: 'Exquisite bridal lehengas, sarees and designer wedding attire with custom stitching.', img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&q=80&w=600', location: 'Ahmedabad, Gujarat', email: 'info@maharanibridal.in', reviews: [{ user: 'Neha P.', rating: 5, comment: 'The finest lehengas I have ever seen. Perfect fit and beautiful designs!' }] },
+          { id: 14, name: 'Royal Designer Collection', category: 'Bridal Wear', rating: 4.6, price: 120000, desc: 'Traditional and contemporary bridal wear for all Indian weddings with premium fabrics.', img: 'https://images.unsplash.com/photo-1582053577922-40da08e86fef?auto=format&fit=crop&q=80&w=600', location: 'Mumbai, Maharashtra', email: 'orders@royaldesigner.in', reviews: [] },
+          { id: 15, name: 'Jewels & Gems Palace', category: 'Jewelry', rating: 4.8, price: 200000, desc: 'Authentic gold and diamond jewelry with certified precious stones for Indian weddings.', img: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&q=80&w=600', location: 'Jaipur, Rajasthan', email: 'sales@jewelsgems.in', reviews: [{ user: 'Anjali M.', rating: 5, comment: 'Outstanding jewelry designs and perfect craftsmanship!' }] },
+          { id: 16, name: 'Golden Touch Jewelers', category: 'Jewelry', rating: 4.7, price: 180000, desc: 'Premium bridal jewelry sets including bangles, necklaces and traditional ornaments.', img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&q=80&w=600', location: 'Pune, Maharashtra', email: 'orders@goldentouch.in', reviews: [] },
+          { id: 17, name: 'Floral Dreams Decorators', category: 'Decorator', rating: 4.8, price: 120000, desc: 'Fresh flower arrangements, traditional mandap decor and stage decorations.', img: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&q=80&w=600', location: 'Hyderabad, Telangana', email: 'info@floraldecorators.in', reviews: [] },
+          { id: 18, name: 'Shri Wedding Planners', category: 'Event Planner', rating: 4.9, price: 100000, desc: 'Complete wedding management from theme selection to day-of coordination with zero stress.', img: 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&q=80&w=600', location: 'Surat, Gujarat', email: 'info@shriplanners.in', reviews: [{ user: 'Radhika V.', rating: 5, comment: 'They managed everything flawlessly. Our wedding was a dream!' }] },
+          { id: 19, name: 'Golden Occasions Events', category: 'Event Planner', rating: 4.7, price: 85000, desc: 'Expert wedding planning with attention to every detail and Indian traditions.', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600', location: 'Indore, Madhya Pradesh', email: 'contact@goldenoccasions.in', reviews: [] },
+          { id: 20, name: 'Spice & Taste Catering', category: 'Caterer', rating: 4.9, price: 900, desc: 'Authentic Rajasthani, Gujarati and Punjabi cuisines with modern presentation.', img: 'https://images.unsplash.com/photo-1565123409695-7b5ef63df2efafbe7adfb72a265bbb50?auto=format&fit=crop&q=80&w=600', location: 'Udaipur, Rajasthan', email: 'bookings@spicetaste.in', reviews: [{ user: 'Rajesh P.', rating: 5, comment: 'Best Rajasthani food for our wedding. Guests loved every dish!' }] },
+          { id: 21, name: 'North Star Photographer', category: 'Photographer', rating: 4.8, price: 80000, desc: 'Cinematic wedding videography with drone shots and same-day editing.', img: 'https://images.unsplash.com/photo-1570303008313-7e23cfb007cb?auto=format&fit=crop&q=80&w=600', location: 'New Delhi, Delhi', email: 'studio@northstar.in', reviews: [] },
+          { id: 22, name: 'Classic Moments Photography', category: 'Photographer', rating: 4.7, price: 70000, desc: 'Traditional and candid wedding photography capturing every precious moment.', img: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&q=80&w=600', location: 'Nashik, Maharashtra', email: 'contact@classicmoments.in', reviews: [] },
+          { id: 23, name: 'Sindoor Makeup Studio', category: 'Makeup Artist', rating: 4.9, price: 40000, desc: 'Bridal and groom makeup with HD quality coverage and organic products.', img: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=600', location: 'Goa', email: 'bookings@sindoor.in', reviews: [{ user: 'Priya R.', rating: 5, comment: 'My makeup lasted the entire wedding without a single touch-up!' }] },
+          { id: 24, name: 'Bridal Beauty Parlor', category: 'Makeup Artist', rating: 4.6, price: 32000, desc: 'Expert bridal and party makeup with skincare and pre-wedding treatments.', img: 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&q=80&w=600', location: 'Vadodara, Gujarat', email: 'salon@bridalbeauty.in', reviews: [] },
+          { id: 25, name: 'Royal Feast Catering', category: 'Caterer', rating: 4.8, price: 850, desc: 'Multi-cuisine catering with South Indian specialties and continental options.', img: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=600', location: 'Kochi, Kerala', email: 'events@royalfeast.in', reviews: [] },
+          { id: 26, name: 'Invitations by Design', category: 'Stationery', rating: 4.7, price: 15000, desc: 'Custom wedding invitation cards with traditional Indian designs and personalization.', img: 'https://images.unsplash.com/photo-1595776119443-d06dafcdcc15?auto=format&fit=crop&q=80&w=600', location: 'Indore, Madhya Pradesh', email: 'design@invitationsbydesign.in', reviews: [] },
+          { id: 27, name: 'Wedding Cards Premium', category: 'Stationery', rating: 4.6, price: 12000, desc: 'Eco-friendly wedding cards with intricate designs and gold foil printing.', img: 'https://images.unsplash.com/photo-1590308470209-9634a4e90c34?auto=format&fit=crop&q=80&w=600', location: 'Lucknow, Uttar Pradesh', email: 'orders@cardspremium.in', reviews: [] },
+          { id: 28, name: 'Heritage Havelis Venue', category: 'Venue', rating: 4.9, price: 250000, desc: 'Stunning heritage havelis and forts perfect for destination Indian weddings.', img: 'https://images.unsplash.com/photo-1519222220978-813980954a7f?auto=format&fit=crop&q=80&w=600', location: 'Jaisalmer, Rajasthan', email: 'bookings@heritagehavelis.in', reviews: [{ user: 'Vikas K.', rating: 5, comment: 'A fairy tale wedding in the most beautiful venue!' }] },
+          { id: 29, name: 'Symphony Orchestra Services', category: 'DJ/Music', rating: 4.8, price: 120000, desc: 'Live orchestra and classical musicians for engagement and mehendi ceremonies.', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600', location: 'Mumbai, Maharashtra', email: 'bookings@symphonyorchestra.in', reviews: [] },
+          { id: 30, name: 'Mehendi Palace', category: 'Bridal Wear', rating: 4.8, price: 80000, desc: 'Beautiful mehendi dresses and casual wedding wear with contemporary designs.', img: 'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?auto=format&fit=crop&q=80&w=600', location: 'Surat, Gujarat', email: 'style@mehendipalace.in', reviews: [] }
+        ]);
+      });
   }, []);
 
-  const categories = ['All', 'Photographer', 'Caterer', 'Decorator', 'Makeup Artist'];
+  const categories = ['All', 'Photographer', 'Caterer', 'Decorator', 'Makeup Artist', 'Venue', 'DJ/Music', 'Bridal Wear', 'Jewelry', 'Event Planner', 'Stationery'];
 
   const filteredVendors = vendors.filter(v => {
     const matchesSearch = v.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -1215,7 +1268,7 @@ const Dashboard = ({ user, setPage, setSelectedVendorObject, favorites, toggleFa
 
       {/* Search and Filter UI */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100 mb-12 space-y-6">
-        <div className="flex flex-col md:flex-row gap-6 items-center">
+        <div className="flex flex-col md:flex-row gap-6 items-end md:items-center">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400" />
             <input 
@@ -1226,25 +1279,17 @@ const Dashboard = ({ user, setPage, setSelectedVendorObject, favorites, toggleFa
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar">
-            <Filter className="h-5 w-5 text-stone-400 mr-2 hidden md:block" />
-            {categories.map(cat => (
-              <motion.button 
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all ${
-                  selectedCategory === cat 
-                    ? 'bg-rose-500 text-white shadow-md' 
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                animate={{ backgroundColor: selectedCategory === cat ? '#f43b5a' : '#f5f5f4' }}
-                transition={{ type: 'spring', damping: 20 }}
-              >
-                {cat}
-              </motion.button>
-            ))}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Filter className="h-5 w-5 text-stone-400 hidden md:block" />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2 rounded-lg border border-stone-200 bg-white text-stone-700 font-medium focus:ring-2 focus:ring-rose-500 outline-none transition-all w-full md:w-48"
+            >
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
         </div>
         
@@ -1698,45 +1743,43 @@ const BudgetTracker = ({ user, setPage, showMessage }: { user: UserData | null, 
   const [budgetItems, setBudgetItems] = useState<any[]>([]);
   const [formData, setFormData] = useState({ category: 'Venue', description: '', amount: '' });
   
+  // Load from localStorage
   useEffect(() => {
     if (user) {
-      fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
+      const saved = localStorage.getItem(`budget_${user.id}`);
+      if (saved) {
+        const items = JSON.parse(saved);
+        setBudgetItems(items);
+      }
     }
   }, [user]);
 
-  const handleAddItem = async (e: React.FormEvent) => {
+  const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !formData.amount) return;
     
-    const res = await fetch('/api/budget', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        category: formData.category,
-        description: formData.description,
-        amount: parseFloat(formData.amount)
-      })
-    });
+    const newItem = {
+      item_id: Date.now(),
+      user_id: user.id,
+      category: formData.category,
+      description: formData.description,
+      amount: parseFloat(formData.amount),
+      created_at: new Date().toISOString()
+    };
     
-    const data = await res.json();
-    if (data.success) {
-      setFormData({ category: 'Venue', description: '', amount: '' });
-      showMessage('success', 'Budget item added!');
-      if (user) {
-        fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
-      }
-    }
+    const updated = [...budgetItems, newItem];
+    setBudgetItems(updated);
+    localStorage.setItem(`budget_${user.id}`, JSON.stringify(updated));
+    setFormData({ category: 'Venue', description: '', amount: '' });
+    showMessage('success', 'Budget item added!');
   };
 
-  const handleDeleteItem = async (itemId: number) => {
-    const res = await fetch(`/api/budget/${itemId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showMessage('success', 'Budget item removed!');
-      if (user) {
-        fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
-      }
-    }
+  const handleDeleteItem = (itemId: number) => {
+    if (!user) return;
+    const updated = budgetItems.filter(item => item.item_id !== itemId);
+    setBudgetItems(updated);
+    localStorage.setItem(`budget_${user.id}`, JSON.stringify(updated));
+    showMessage('success', 'Budget item removed!');
   };
 
   const totalBudget = budgetItems.reduce((sum, item) => sum + item.amount, 0);
@@ -1931,45 +1974,43 @@ const PhotoGallery = ({ user, setPage, showMessage }: { user: UserData | null, s
   const [formData, setFormData] = useState({ imageUrl: '', title: '', category: 'Inspiration' });
   const [selectedCategory, setSelectedCategory] = useState('All');
   
+  // Load from localStorage
   useEffect(() => {
     if (user) {
-      fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
+      const saved = localStorage.getItem(`gallery_${user.id}`);
+      if (saved) {
+        const items = JSON.parse(saved);
+        setPhotos(items);
+      }
     }
   }, [user]);
 
-  const handleAddPhoto = async (e: React.FormEvent) => {
+  const handleAddPhoto = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !formData.imageUrl || !formData.title) return;
     
-    const res = await fetch('/api/gallery', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        imageUrl: formData.imageUrl,
-        title: formData.title,
-        category: formData.category
-      })
-    });
+    const newPhoto = {
+      photo_id: Date.now(),
+      user_id: user.id,
+      image_url: formData.imageUrl,
+      title: formData.title,
+      category: formData.category,
+      created_at: new Date().toISOString()
+    };
     
-    const data = await res.json();
-    if (data.success) {
-      setFormData({ imageUrl: '', title: '', category: 'Inspiration' });
-      showMessage('success', 'Photo added to gallery!');
-      if (user) {
-        fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
-      }
-    }
+    const updated = [...photos, newPhoto];
+    setPhotos(updated);
+    localStorage.setItem(`gallery_${user.id}`, JSON.stringify(updated));
+    setFormData({ imageUrl: '', title: '', category: 'Inspiration' });
+    showMessage('success', 'Photo added to gallery!');
   };
 
-  const handleDeletePhoto = async (photoId: number) => {
-    const res = await fetch(`/api/gallery/${photoId}`, { method: 'DELETE' });
-    if (res.ok) {
-      showMessage('success', 'Photo removed!');
-      if (user) {
-        fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
-      }
-    }
+  const handleDeletePhoto = (photoId: number) => {
+    if (!user) return;
+    const updated = photos.filter(photo => photo.photo_id !== photoId);
+    setPhotos(updated);
+    localStorage.setItem(`gallery_${user.id}`, JSON.stringify(updated));
+    showMessage('success', 'Photo removed!');
   };
 
   const categories = ['All', 'Inspiration', 'Decorations', 'Dress', 'Venue', 'Makeup', 'Other'];
@@ -2121,12 +2162,35 @@ const PhotoGallery = ({ user, setPage, showMessage }: { user: UserData | null, s
 
 const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: string) => void }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   
   useEffect(() => {
     if (user) {
       fetch(`/api/bookings/${user.id}`).then(res => res.json()).then(setBookings);
     }
   }, [user]);
+
+  const handleDeleteBooking = async (bookingId: number) => {
+    if (window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
+      setDeletingId(bookingId);
+      try {
+        const response = await fetch(`/api/bookings/${bookingId}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        if (data.success) {
+          setBookings(bookings.filter(b => b.booking_id !== bookingId));
+        } else {
+          alert('Failed to delete booking. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('Error deleting booking. Please try again.');
+      } finally {
+        setDeletingId(null);
+      }
+    }
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -2174,11 +2238,22 @@ const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: str
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-stone-800 font-bold text-lg">₹{b.budget.toLocaleString()}</div>
-                <motion.div className="text-emerald-500 text-xs flex items-center gap-1 justify-end font-medium" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-                  <CheckCircle className="h-3 w-3" /> Confirmed
-                </motion.div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-stone-800 font-bold text-lg">₹{b.budget.toLocaleString()}</div>
+                  <motion.div className="text-emerald-500 text-xs flex items-center gap-1 justify-end font-medium" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+                    <CheckCircle className="h-3 w-3" /> Confirmed
+                  </motion.div>
+                </div>
+                <motion.button
+                  onClick={() => handleDeleteBooking(b.booking_id)}
+                  disabled={deletingId === b.booking_id}
+                  className="ml-4 px-4 py-2 bg-red-50 text-red-500 rounded-lg font-bold text-sm hover:bg-red-100 transition-colors disabled:opacity-50"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {deletingId === b.booking_id ? 'Deleting...' : 'Cancel'}
+                </motion.button>
               </div>
             </motion.div>
           ))}
