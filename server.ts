@@ -30,6 +30,26 @@ db.exec(`
     PRIMARY KEY (user_id, vendor_id),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS budget_items (
+    item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS photo_gallery (
+    photo_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    image_url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // --- Mock Vendor Data (Indian Context) ---
@@ -183,6 +203,66 @@ async function startServer() {
   app.get("/api/bookings/:userId", (req, res) => {
     const bookings = db.prepare("SELECT * FROM bookings WHERE user_id = ?").all(req.params.userId);
     res.json(bookings);
+  });
+
+  // Budget Tracker
+  app.post("/api/budget", (req, res) => {
+    const { userId, category, description, amount } = req.body;
+    try {
+      const stmt = db.prepare("INSERT INTO budget_items (user_id, category, description, amount, created_at) VALUES (?, ?, ?, ?, ?)");
+      const result = stmt.run(userId, category, description, amount, new Date().toISOString());
+      res.json({ success: true, itemId: result.lastInsertRowid });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.get("/api/budget/:userId", (req, res) => {
+    const items = db.prepare("SELECT * FROM budget_items WHERE user_id = ? ORDER BY created_at DESC").all(req.params.userId);
+    res.json(items);
+  });
+
+  app.delete("/api/budget/:itemId", (req, res) => {
+    const { itemId } = req.params;
+    try {
+      db.prepare("DELETE FROM budget_items WHERE item_id = ?").run(itemId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Photo Gallery
+  app.post("/api/gallery", (req, res) => {
+    const { userId, imageUrl, title, category } = req.body;
+    try {
+      const stmt = db.prepare("INSERT INTO photo_gallery (user_id, image_url, title, category, created_at) VALUES (?, ?, ?, ?, ?)");
+      const result = stmt.run(userId, imageUrl, title, category || 'Inspiration', new Date().toISOString());
+      res.json({ success: true, photoId: result.lastInsertRowid });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.get("/api/gallery/:userId", (req, res) => {
+    const photos = db.prepare("SELECT * FROM photo_gallery WHERE user_id = ? ORDER BY created_at DESC").all(req.params.userId);
+    res.json(photos);
+  });
+
+  app.delete("/api/gallery/:photoId", (req, res) => {
+    const { photoId } = req.params;
+    try {
+      db.prepare("DELETE FROM photo_gallery WHERE photo_id = ?").run(photoId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Contact Form
+  app.post("/api/contact", (req, res) => {
+    // For now, just return success
+    res.json({ success: true });
   });
 
   // --- Vite Integration ---

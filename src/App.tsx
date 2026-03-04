@@ -64,6 +64,8 @@ const Navbar = ({ user, onLogout, setPage }: { user: UserData | null, onLogout: 
                 <button onClick={() => setPage('dashboard')} className="text-stone-600 hover:text-rose-500 transition-colors">Vendors</button>
                 <button onClick={() => setPage('favorites')} className="text-stone-600 hover:text-rose-500 transition-colors">Favorites</button>
                 <button onClick={() => setPage('my-bookings')} className="text-stone-600 hover:text-rose-500 transition-colors">My Bookings</button>
+                <button onClick={() => setPage('budget')} className="text-stone-600 hover:text-rose-500 transition-colors">Budget</button>
+                <button onClick={() => setPage('gallery')} className="text-stone-600 hover:text-rose-500 transition-colors">Gallery</button>
                 <div className="flex items-center space-x-4 border-l pl-8 border-stone-200">
                   <button onClick={() => setPage('profile')} className="flex items-center gap-2 text-stone-800 font-bold hover:text-rose-500 transition-colors">
                     <User className="h-4 w-4" /> {user.name}
@@ -107,6 +109,8 @@ const Navbar = ({ user, onLogout, setPage }: { user: UserData | null, onLogout: 
                   <button onClick={() => { setPage('dashboard'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Vendors</button>
                   <button onClick={() => { setPage('favorites'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Favorites</button>
                   <button onClick={() => { setPage('my-bookings'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">My Bookings</button>
+                  <button onClick={() => { setPage('budget'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Budget</button>
+                  <button onClick={() => { setPage('gallery'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Gallery</button>
                   <button onClick={() => { setPage('profile'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-800 font-bold">Profile</button>
                   <button onClick={() => { onLogout(); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-400">Logout</button>
                 </>
@@ -1192,12 +1196,18 @@ const Dashboard = ({ user, setPage, setSelectedVendorObject, favorites, toggleFa
           <p className="text-stone-500">Find and book the best vendors for your wedding.</p>
         </div>
         {user && (
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             <button onClick={() => setPage('favorites')} className="flex items-center gap-2 text-rose-500 font-bold hover:underline">
               <Heart className="h-5 w-5" /> My Favorites
             </button>
             <button onClick={() => setPage('my-bookings')} className="flex items-center gap-2 text-rose-500 font-bold hover:underline">
               <Calendar className="h-5 w-5" /> My Bookings
+            </button>
+            <button onClick={() => setPage('budget')} className="flex items-center gap-2 text-rose-500 font-bold hover:underline">
+              <DollarSign className="h-5 w-5" /> Budget
+            </button>
+            <button onClick={() => setPage('gallery')} className="flex items-center gap-2 text-rose-500 font-bold hover:underline">
+              📸 Gallery
             </button>
           </div>
         )}
@@ -1684,6 +1694,431 @@ const BookingConfirmation = ({ bookingId, setPage }: { bookingId: number | null,
   );
 };
 
+const BudgetTracker = ({ user, setPage, showMessage }: { user: UserData | null, setPage: (p: string) => void, showMessage: (type: 'success' | 'error', text: string) => void }) => {
+  const [budgetItems, setBudgetItems] = useState<any[]>([]);
+  const [formData, setFormData] = useState({ category: 'Venue', description: '', amount: '' });
+  
+  useEffect(() => {
+    if (user) {
+      fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
+    }
+  }, [user]);
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !formData.amount) return;
+    
+    const res = await fetch('/api/budget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        category: formData.category,
+        description: formData.description,
+        amount: parseFloat(formData.amount)
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      setFormData({ category: 'Venue', description: '', amount: '' });
+      showMessage('success', 'Budget item added!');
+      if (user) {
+        fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
+      }
+    }
+  };
+
+  const handleDeleteItem = async (itemId: number) => {
+    const res = await fetch(`/api/budget/${itemId}`, { method: 'DELETE' });
+    if (res.ok) {
+      showMessage('success', 'Budget item removed!');
+      if (user) {
+        fetch(`/api/budget/${user.id}`).then(res => res.json()).then(setBudgetItems);
+      }
+    }
+  };
+
+  const totalBudget = budgetItems.reduce((sum, item) => sum + item.amount, 0);
+  const categoryTotals = budgetItems.reduce((acc: any, item) => {
+    acc[item.category] = (acc[item.category] || 0) + item.amount;
+    return acc;
+  }, {});
+
+  const categories = ['Venue', 'Catering', 'Photography', 'Decoration', 'Makeup', 'Entertainment', 'Other'];
+  const categoryColors: any = {
+    'Venue': '#f43b5a',
+    'Catering': '#f97316',
+    'Photography': '#3b82f6',
+    'Decoration': '#ec4899',
+    'Makeup': '#a855f7',
+    'Entertainment': '#06b6d4',
+    'Other': '#64748b'
+  };
+
+  return (
+    <motion.div 
+      className="max-w-7xl mx-auto px-4 py-12" 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div className="flex justify-between items-center mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h2 className="text-4xl font-serif font-bold text-stone-800">Wedding Budget</h2>
+        <motion.button onClick={() => setPage('dashboard')} className="text-rose-500 font-bold hover:underline" whileHover={{ x: 5 }}>Back to Dashboard</motion.button>
+      </motion.div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {/* Add Budget Form */}
+        <motion.div 
+          className="md:col-span-1 bg-white rounded-2xl p-8 shadow-lg border border-stone-100"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h3 className="text-xl font-bold text-stone-800 mb-6">Add Expense</h3>
+          <form onSubmit={handleAddItem} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Category</label>
+              <select 
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Description</label>
+              <input 
+                type="text" 
+                placeholder="e.g., Main venue"
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Amount (₹)</label>
+              <input 
+                required 
+                type="number" 
+                placeholder="Enter amount"
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                value={formData.amount}
+                onChange={e => setFormData({...formData, amount: e.target.value})}
+              />
+            </div>
+            <motion.button 
+              type="submit" 
+              className="w-full bg-rose-500 text-white py-2 rounded-lg font-bold hover:bg-rose-600 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Add Item
+            </motion.button>
+          </form>
+        </motion.div>
+
+        {/* Budget Summary & Chart */}
+        <motion.div 
+          className="md:col-span-2 bg-white rounded-2xl p-8 shadow-lg border border-stone-100"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h3 className="text-xl font-bold text-stone-800 mb-6">Budget Summary</h3>
+          <div className="mb-8">
+            <div className="flex justify-between items-end mb-4">
+              <div>
+                <p className="text-xs text-stone-400">Total Budget</p>
+                <p className="text-4xl font-bold text-stone-800">₹{totalBudget.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-stone-400">Items</p>
+                <p className="text-2xl font-bold text-rose-500">{budgetItems.length}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Breakdown */}
+          <div className="space-y-3">
+            {Object.entries(categoryTotals).map(([cat, amount]: any) => {
+              const percentage = (amount / totalBudget) * 100;
+              return (
+                <motion.div 
+                  key={cat}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="h-3 w-3 rounded-full" 
+                        style={{ backgroundColor: categoryColors[cat] || '#64748b' }}
+                      />
+                      <span className="text-sm font-medium text-stone-700">{cat}</span>
+                    </div>
+                    <span className="text-sm font-bold text-stone-800">₹{amount.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
+                    <motion.div 
+                      className="h-full rounded-full" 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percentage}%` }}
+                      transition={{ delay: 0.4, duration: 0.8 }}
+                      style={{ backgroundColor: categoryColors[cat] || '#64748b' }}
+                    />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Budget Items List */}
+      <motion.div 
+        className="mt-8 bg-white rounded-2xl p-8 shadow-lg border border-stone-100"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <h3 className="text-xl font-bold text-stone-800 mb-6">All Expenses</h3>
+        {budgetItems.length === 0 ? (
+          <p className="text-stone-500 text-center py-8">No budget items. Add one to get started!</p>
+        ) : (
+          <div className="space-y-3">
+            {budgetItems.map((item) => (
+              <motion.div 
+                key={item.item_id}
+                className="flex items-center justify-between p-4 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors"
+                whileHover={{ x: 5 }}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div 
+                    className="h-3 w-3 rounded-full" 
+                    style={{ backgroundColor: categoryColors[item.category] || '#64748b' }}
+                  />
+                  <div>
+                    <p className="font-bold text-stone-800">{item.description || item.category}</p>
+                    <p className="text-xs text-stone-400">{item.category}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-bold text-stone-800 text-lg">₹{item.amount.toLocaleString()}</span>
+                  <motion.button 
+                    onClick={() => handleDeleteItem(item.item_id)}
+                    className="text-stone-400 hover:text-rose-500 transition-colors"
+                    whileHover={{ scale: 1.2 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    ✕
+                  </motion.button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const PhotoGallery = ({ user, setPage, showMessage }: { user: UserData | null, setPage: (p: string) => void, showMessage: (type: 'success' | 'error', text: string) => void }) => {
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [formData, setFormData] = useState({ imageUrl: '', title: '', category: 'Inspiration' });
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  
+  useEffect(() => {
+    if (user) {
+      fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
+    }
+  }, [user]);
+
+  const handleAddPhoto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !formData.imageUrl || !formData.title) return;
+    
+    const res = await fetch('/api/gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        imageUrl: formData.imageUrl,
+        title: formData.title,
+        category: formData.category
+      })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      setFormData({ imageUrl: '', title: '', category: 'Inspiration' });
+      showMessage('success', 'Photo added to gallery!');
+      if (user) {
+        fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
+      }
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    const res = await fetch(`/api/gallery/${photoId}`, { method: 'DELETE' });
+    if (res.ok) {
+      showMessage('success', 'Photo removed!');
+      if (user) {
+        fetch(`/api/gallery/${user.id}`).then(res => res.json()).then(setPhotos);
+      }
+    }
+  };
+
+  const categories = ['All', 'Inspiration', 'Decorations', 'Dress', 'Venue', 'Makeup', 'Other'];
+  const filteredPhotos = selectedCategory === 'All' ? photos : photos.filter(p => p.category === selectedCategory);
+
+  return (
+    <motion.div 
+      className="max-w-7xl mx-auto px-4 py-12" 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div className="flex justify-between items-center mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h2 className="text-4xl font-serif font-bold text-stone-800">Wedding Inspiration</h2>
+        <motion.button onClick={() => setPage('dashboard')} className="text-rose-500 font-bold hover:underline" whileHover={{ x: 5 }}>Back to Dashboard</motion.button>
+      </motion.div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {/* Add Photo Form */}
+        <motion.div 
+          className="md:col-span-1 bg-white rounded-2xl p-8 shadow-lg border border-stone-100"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h3 className="text-xl font-bold text-stone-800 mb-6">Add Photo</h3>
+          <form onSubmit={handleAddPhoto} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Photo URL</label>
+              <input 
+                required
+                type="url" 
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none text-xs"
+                value={formData.imageUrl}
+                onChange={e => setFormData({...formData, imageUrl: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Title</label>
+              <input 
+                required
+                type="text" 
+                placeholder="e.g., Dream Venue"
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 mb-2">Category</label>
+              <select 
+                className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                {categories.slice(1).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <motion.button 
+              type="submit" 
+              className="w-full bg-rose-500 text-white py-2 rounded-lg font-bold hover:bg-rose-600 transition-colors text-sm"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Add Photo
+            </motion.button>
+          </form>
+        </motion.div>
+
+        {/* Category Filter */}
+        <motion.div 
+          className="md:col-span-2"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="flex gap-2 flex-wrap mb-6">
+            {categories.map(cat => (
+              <motion.button 
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  selectedCategory === cat 
+                    ? 'bg-rose-500 text-white shadow-md' 
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {cat}
+              </motion.button>
+            ))}
+          </div>
+
+          {filteredPhotos.length === 0 ? (
+            <motion.div className="bg-white p-12 rounded-2xl text-center border-2 border-dashed border-stone-200" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <p className="text-stone-500">No photos in this category. Add one to get inspired!</p>
+            </motion.div>
+          ) : (
+            <motion.div 
+              className="grid grid-cols-2 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: { staggerChildren: 0.05 }
+                }
+              }}
+            >
+              {filteredPhotos.map((photo) => (
+                <motion.div 
+                  key={photo.photo_id}
+                  className="relative group rounded-lg overflow-hidden shadow-lg"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <img 
+                    src={photo.image_url} 
+                    alt={photo.title}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all flex flex-col items-center justify-between p-4">
+                    <div className="flex items-center justify-between w-full pt-0">
+                      <span className="bg-rose-500 text-white px-3 py-1 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition-all">{photo.category}</span>
+                      <motion.button 
+                        onClick={() => handleDeletePhoto(photo.photo_id)}
+                        className="text-white bg-red-500 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        ✕
+                      </motion.button>
+                    </div>
+                    <p className="text-white font-bold text-center opacity-0 group-hover:opacity-100 transition-all">{photo.title}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+};
+
 const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: string) => void }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   
@@ -1852,6 +2287,8 @@ export default function App() {
           {page === 'booking' && <motion.div key="booking" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}><BookingPage user={user} selectedVendor={selectedVendorObject} setPage={setPage} showMessage={showMessage} setLastBookingId={setLastBookingId} /></motion.div>}
           {page === 'confirmation' && <motion.div key="confirmation" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}><BookingConfirmation bookingId={lastBookingId} setPage={setPage} /></motion.div>}
           {page === 'my-bookings' && <motion.div key="my-bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MyBookings user={user} setPage={setPage} /></motion.div>}
+          {page === 'budget' && <motion.div key="budget" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BudgetTracker user={user} setPage={setPage} showMessage={showMessage} /></motion.div>}
+          {page === 'gallery' && <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PhotoGallery user={user} setPage={setPage} showMessage={showMessage} /></motion.div>}
           {page === 'profile' && <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}><Profile user={user} setUser={setUser} showMessage={showMessage} /></motion.div>}
           {page === 'favorites' && <motion.div key="favorites" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Favorites user={user} setPage={setPage} setSelectedVendorObject={setSelectedVendorObject} favorites={favorites} toggleFavorite={toggleFavorite} /></motion.div>}
         </AnimatePresence>
