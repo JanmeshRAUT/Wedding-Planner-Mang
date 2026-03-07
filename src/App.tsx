@@ -915,32 +915,26 @@ const Register = ({ setPage, showMessage }: { setPage: (p: string) => void, show
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (!res.ok) throw new Error('API failed');
-      const data = await res.json();
-      if (data.success) {
-        showMessage('success', 'Registration successful! Please login.');
-        setPage('login');
-      } else {
-        throw new Error(data.message || 'Registration failed');
-      }
-    } catch (err) {
-      // Vercel serverless fallback / Offline mode
-      const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
-      if (localUsers.find((u: any) => u.email === formData.email)) {
-        showMessage('error', 'Email already exists');
-        return;
-      }
-      localUsers.push({ id: Date.now(), ...formData });
-      localStorage.setItem('wedding_mock_users', JSON.stringify(localUsers));
-      showMessage('success', 'Registration successful! Please login.');
-      setPage('login');
+    const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
+    if (localUsers.find((u: any) => u.email === formData.email)) {
+      showMessage('error', 'Email already exists');
+      return;
     }
+    
+    // Always save to localStorage to persist across Vercel reloads
+    const newId = Date.now();
+    localUsers.push({ id: newId, ...formData });
+    localStorage.setItem('wedding_mock_users', JSON.stringify(localUsers));
+
+    // Fire & forget to backend if available
+    fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    }).catch(e=>e);
+
+    showMessage('success', 'Registration successful! Please login.');
+    setPage('login');
   };
 
   return (
@@ -1084,6 +1078,24 @@ const Login = ({ setPage, setUser, showMessage }: { setPage: (p: string) => void
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check localStorage first
+    const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
+    const localUser = localUsers.find((u: any) => u.email === formData.email && u.password === formData.password);
+    
+    if (localUser) {
+      setUser(localUser);
+      localStorage.setItem('wedding_user', JSON.stringify(localUser));
+      setPage('dashboard');
+      return;
+    } else if (formData.email === 'demo@example.com' && formData.password === 'demo123') {
+      const demoUser = { id: 1, name: 'Demo User', email: 'demo@example.com', phone: '9999999999' };
+      setUser(demoUser);
+      localStorage.setItem('wedding_user', JSON.stringify(demoUser));
+      setPage('dashboard');
+      return;
+    }
+
     try {
       const res = await fetch('/api/login', {
         method: 'POST',
@@ -1097,24 +1109,10 @@ const Login = ({ setPage, setUser, showMessage }: { setPage: (p: string) => void
         localStorage.setItem('wedding_user', JSON.stringify(data.user));
         setPage('dashboard');
       } else {
-        throw new Error(data.message || 'Login failed');
+        showMessage('error', data.message || 'Invalid credentials');
       }
     } catch (err) {
-      // Vercel serverless fallback / Offline mode
-      const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
-      const user = localUsers.find((u: any) => u.email === formData.email && u.password === formData.password);
-      if (user) {
-        setUser(user);
-        localStorage.setItem('wedding_user', JSON.stringify(user));
-        setPage('dashboard');
-      } else if (formData.email === 'demo@example.com' && formData.password === 'demo123') {
-        const demoUser = { id: 1, name: 'Demo User', email: 'demo@example.com', phone: '9999999999' };
-        setUser(demoUser);
-        localStorage.setItem('wedding_user', JSON.stringify(demoUser));
-        setPage('dashboard');
-      } else {
-        showMessage('error', 'Invalid credentials');
-      }
+      showMessage('error', 'Invalid credentials');
     }
   };
 
@@ -1608,6 +1606,20 @@ const BookingPage = ({ user, selectedVendor, setPage, showMessage, setLastBookin
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Write-through cache: Always save to localStorage immediately
+    const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
+    const newBookingId = Date.now();
+    localBookings.push({
+      booking_id: newBookingId,
+      user_id: String(user?.id),
+      vendor_name: selectedVendor.name,
+      booking_date: formData.date,
+      budget: parseFloat(formData.budget),
+      payment_status: 'pending'
+    });
+    localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
+    
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -1619,30 +1631,12 @@ const BookingPage = ({ user, selectedVendor, setPage, showMessage, setLastBookin
           budget: parseFloat(formData.budget)
         })
       });
-      if (!res.ok) throw new Error('API failed');
       const data = await res.json();
-      if (data.success) {
-        setLastBookingId(data.bookingId);
-        setPage('payment');
-      } else {
-        throw new Error(data.message || 'Booking failed');
-      }
-    } catch (err) {
-      // Vercel Fallback
-      const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
-      const newBookingId = Date.now();
-      localBookings.push({
-        booking_id: newBookingId,
-        user_id: String(user?.id),
-        vendor_name: selectedVendor.name,
-        booking_date: formData.date,
-        budget: parseFloat(formData.budget),
-        payment_status: 'pending'
-      });
-      localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
+      setLastBookingId(data.success ? data.bookingId : newBookingId);
+    } catch {
       setLastBookingId(newBookingId);
-      setPage('payment');
     }
+    setPage('payment');
   };
 
   return (
@@ -1748,8 +1742,31 @@ const PaymentPage = ({ user, selectedVendor, bookingId, setPage, showMessage }: 
     await new Promise(r => setTimeout(r, 2500));
     const methodStr = paymentMethod === 'card' ? 'Credit/Debit Card' : paymentMethod === 'upi' ? 'UPI' : 'Net Banking';
     
+    // Write-through cache: Always save to localStorage immediately
+    const localPayments = JSON.parse(localStorage.getItem('wedding_mock_payments') || '[]');
+    localPayments.push({
+      payment_id: Date.now(),
+      booking_id: bookingId,
+      user_id: String(user?.id),
+      amount,
+      method: methodStr,
+      status: 'success',
+      transaction_id: 'TXN' + Math.random().toString().slice(2, 10),
+      vendor_name: selectedVendor.name,
+      created_at: new Date().toISOString()
+    });
+    localStorage.setItem('wedding_mock_payments', JSON.stringify(localPayments));
+    
+    // Update local booking status
+    const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
+    const bookingIndex = localBookings.findIndex((b: any) => b.booking_id === bookingId);
+    if (bookingIndex > -1) {
+      localBookings[bookingIndex].payment_status = 'paid';
+      localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
+    }
+
     try {
-      const res = await fetch('/api/payments', {
+      fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1759,42 +1776,11 @@ const PaymentPage = ({ user, selectedVendor, bookingId, setPage, showMessage }: 
           method: methodStr,
           vendorName: selectedVendor.name
         })
-      });
-      if (!res.ok) throw new Error('API failed');
-      const data = await res.json();
-      if (data.success) {
-        showMessage('success', `Payment of ₹${amount.toLocaleString()} successful!`);
-        setPage('confirmation');
-      } else {
-        throw new Error(data.message || 'Payment failed');
-      }
-    } catch (err) {
-      // Vercel Fallback
-      const localPayments = JSON.parse(localStorage.getItem('wedding_mock_payments') || '[]');
-      localPayments.push({
-        payment_id: Date.now(),
-        booking_id: bookingId,
-        user_id: String(user?.id),
-        amount,
-        method: methodStr,
-        status: 'success',
-        transaction_id: 'TXN' + Math.random().toString().slice(2, 10),
-        vendor_name: selectedVendor.name,
-        created_at: new Date().toISOString()
-      });
-      localStorage.setItem('wedding_mock_payments', JSON.stringify(localPayments));
-      
-      // Update local booking status
-      const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
-      const bookingIndex = localBookings.findIndex((b: any) => b.booking_id === bookingId);
-      if (bookingIndex > -1) {
-        localBookings[bookingIndex].payment_status = 'paid';
-        localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
-      }
-      
-      showMessage('success', `Payment of ₹${amount.toLocaleString()} successful!`);
-      setPage('confirmation');
-    }
+      }).catch(e=>e);
+    } catch {}
+
+    showMessage('success', `Payment of ₹${amount.toLocaleString()} successful!`);
+    setPage('confirmation');
     setProcessing(false);
   };
 
@@ -2016,13 +2002,17 @@ const PaymentsHistory = ({ user, setPage }: { user: UserData | null, setPage: (p
   useEffect(() => {
     if (user) {
       fetch(`/api/payments/${user.id}`)
-        .then(r => {
-          if (!r.ok) throw new Error('API failed');
-          return r.json();
+        .then(r => r.json().catch(() => []))
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [];
+          const localPayments = JSON.parse(localStorage.getItem('wedding_mock_payments') || '[]')
+            .filter((p: any) => p.user_id === String(user.id));
+          const all = [...arr, ...localPayments];
+          const unique = Array.from(new Map(all.map(item => [item.payment_id, item])).values());
+          setPayments(unique as Payment[]);
+          setLoading(false);
         })
-        .then(data => { setPayments(Array.isArray(data) ? data : []); setLoading(false); })
         .catch(() => {
-          // Vercel fallback
           const localPayments = JSON.parse(localStorage.getItem('wedding_mock_payments') || '[]');
           setPayments(localPayments.filter((p: any) => p.user_id === String(user.id)));
           setLoading(false);
@@ -2620,13 +2610,16 @@ const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: str
   useEffect(() => {
     if (user) {
       fetch(`/api/bookings/${user.id}`)
-        .then(res => {
-          if (!res.ok) throw new Error('API failed');
-          return res.json();
+        .then(res => res.json().catch(() => []))
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [];
+          const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]')
+            .filter((b: any) => b.user_id === String(user.id));
+          const all = [...arr, ...localBookings];
+          const unique = Array.from(new Map(all.map(item => [item.booking_id, item])).values());
+          setBookings(unique as Booking[]);
         })
-        .then(setBookings)
         .catch(() => {
-          // Vercel fallback
           const localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
           setBookings(localBookings.filter((b: any) => b.user_id === String(user.id)));
         });
@@ -2636,26 +2629,18 @@ const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: str
   const handleDeleteBooking = async (bookingId: number) => {
     if (window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
       setDeletingId(bookingId);
+      
+      // Update localStorage immediately
+      let localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
+      localBookings = localBookings.filter((b: any) => b.booking_id !== bookingId);
+      localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
+      
       try {
-        const response = await fetch(`/api/bookings/${bookingId}`, {
-          method: 'DELETE'
-        });
-        if (!response.ok) throw new Error('API failed');
-        const data = await response.json();
-        if (data.success) {
-          setBookings(bookings.filter(b => b.booking_id !== bookingId));
-        } else {
-          throw new Error('Failed to delete booking');
-        }
-      } catch (error) {
-        // Vercel fallback
-        let localBookings = JSON.parse(localStorage.getItem('wedding_mock_bookings') || '[]');
-        localBookings = localBookings.filter((b: any) => b.booking_id !== bookingId);
-        localStorage.setItem('wedding_mock_bookings', JSON.stringify(localBookings));
-        setBookings(bookings.filter(b => b.booking_id !== bookingId));
-      } finally {
-        setDeletingId(null);
-      }
+        await fetch(`/api/bookings/${bookingId}`, { method: 'DELETE' });
+      } catch (e) {}
+      
+      setBookings(bookings.filter(b => b.booking_id !== bookingId));
+      setDeletingId(null);
     }
   };
 
