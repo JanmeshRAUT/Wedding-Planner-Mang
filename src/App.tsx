@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, User, LogIn, LayoutDashboard, Calendar, DollarSign, CheckCircle, LogOut, Menu, X, Search, Filter, Star, MapPin, ArrowLeft, Info } from 'lucide-react';
+import { Heart, User, LogIn, LayoutDashboard, Calendar, DollarSign, CheckCircle, LogOut, Menu, X, Search, Filter, Star, MapPin, ArrowLeft, Info, CreditCard, Shield, Clock, TrendingUp } from 'lucide-react';
 
 // --- Types ---
 interface UserData {
@@ -15,6 +15,19 @@ interface Booking {
   vendor_name: string;
   booking_date: string;
   budget: number;
+  payment_status?: string;
+}
+
+interface Payment {
+  payment_id: number;
+  booking_id: number;
+  user_id: number;
+  amount: number;
+  method: string;
+  status: string;
+  transaction_id: string;
+  vendor_name: string;
+  created_at: string;
 }
 
 interface Review {
@@ -64,6 +77,7 @@ const Navbar = ({ user, onLogout, setPage }: { user: UserData | null, onLogout: 
                 <button onClick={() => setPage('dashboard')} className="text-stone-600 hover:text-rose-500 transition-colors">Vendors</button>
                 <button onClick={() => setPage('favorites')} className="text-stone-600 hover:text-rose-500 transition-colors">Favorites</button>
                 <button onClick={() => setPage('my-bookings')} className="text-stone-600 hover:text-rose-500 transition-colors">My Bookings</button>
+                <button onClick={() => setPage('payments')} className="text-stone-600 hover:text-rose-500 transition-colors">Payments</button>
                 <button onClick={() => setPage('budget')} className="text-stone-600 hover:text-rose-500 transition-colors">Budget</button>
                 <button onClick={() => setPage('gallery')} className="text-stone-600 hover:text-rose-500 transition-colors">Gallery</button>
                 <div className="flex items-center space-x-4 border-l pl-8 border-stone-200">
@@ -109,6 +123,7 @@ const Navbar = ({ user, onLogout, setPage }: { user: UserData | null, onLogout: 
                   <button onClick={() => { setPage('dashboard'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Vendors</button>
                   <button onClick={() => { setPage('favorites'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Favorites</button>
                   <button onClick={() => { setPage('my-bookings'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">My Bookings</button>
+                  <button onClick={() => { setPage('payments'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Payments</button>
                   <button onClick={() => { setPage('budget'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Budget</button>
                   <button onClick={() => { setPage('gallery'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-600">Gallery</button>
                   <button onClick={() => { setPage('profile'); setIsOpen(false); }} className="block w-full text-left px-3 py-2 text-stone-800 font-bold">Profile</button>
@@ -1573,7 +1588,7 @@ const BookingPage = ({ user, selectedVendor, setPage, showMessage, setLastBookin
     const data = await res.json();
     if (data.success) {
       setLastBookingId(data.bookingId);
-      setPage('confirmation');
+      setPage('payment');  // Go to payment page first
     } else {
       showMessage('error', data.message);
     }
@@ -1667,7 +1682,361 @@ const BookingPage = ({ user, selectedVendor, setPage, showMessage, setLastBookin
   );
 };
 
+const PaymentPage = ({ user, selectedVendor, bookingId, setPage, showMessage }: { user: UserData | null, selectedVendor: Vendor | null, bookingId: number | null, setPage: (p: string) => void, showMessage: (type: 'success' | 'error', text: string) => void }) => {
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'netbanking'>('card');
+  const [processing, setProcessing] = useState(false);
+  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
+  const [upiId, setUpiId] = useState('');
+  const [bank, setBank] = useState('SBI');
+
+  if (!selectedVendor || !bookingId) return null;
+  const amount = selectedVendor.price;
+
+  const handlePayment = async () => {
+    setProcessing(true);
+    // Simulate payment processing delay
+    await new Promise(r => setTimeout(r, 2500));
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId,
+          userId: user?.id,
+          amount,
+          method: paymentMethod === 'card' ? 'Credit/Debit Card' : paymentMethod === 'upi' ? 'UPI' : 'Net Banking',
+          vendorName: selectedVendor.name
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMessage('success', `Payment of ₹${amount.toLocaleString()} successful!`);
+        setPage('confirmation');
+      } else {
+        showMessage('error', 'Payment failed. Please try again.');
+        setProcessing(false);
+      }
+    } catch {
+      showMessage('error', 'Payment failed. Please try again.');
+      setProcessing(false);
+    }
+  };
+
+  const methodTabClass = (m: string) =>
+    `flex-1 py-3 text-sm font-bold rounded-xl transition-all ${paymentMethod === m ? 'bg-rose-500 text-white shadow-md' : 'text-stone-600 hover:bg-stone-100'}`;
+
+  if (processing) {
+    return (
+      <motion.div className="max-w-md mx-auto mt-20 p-12 bg-white rounded-3xl shadow-2xl border border-stone-100 text-center"
+        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+        <motion.div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-8"
+          animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}>
+          <CreditCard className="w-10 h-10 text-rose-500" />
+        </motion.div>
+        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-3">Processing Payment...</h2>
+        <p className="text-stone-500">Please wait while we securely process your payment</p>
+        <div className="flex justify-center gap-2 mt-6">
+          {[0, 1, 2].map(i => (
+            <motion.div key={i} className="w-3 h-3 bg-rose-500 rounded-full"
+              animate={{ y: [0, -10, 0] }} transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.15 }} />
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div className="max-w-6xl mx-auto mt-12 px-4 pb-24"
+      initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', damping: 20 }}>
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-10">
+        <button onClick={() => setPage('booking')} className="p-3 bg-stone-100 rounded-full hover:bg-stone-200 transition-colors">
+          <ArrowLeft className="w-6 h-6 text-stone-700" />
+        </button>
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-stone-900">Secure Checkout</h1>
+          <p className="text-stone-500 text-lg mt-1">Complete your booking with {selectedVendor.name}</p>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-12 gap-12">
+        {/* Left: Payment Form */}
+        <div className="lg:col-span-7 space-y-8">
+          {/* Security Badge */}
+          <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 px-6 py-4 rounded-xl">
+            <Shield className="w-6 h-6 text-emerald-600" />
+            <div>
+              <p className="text-emerald-800 font-bold">Safe & Secure Payment</p>
+              <p className="text-emerald-600 text-sm">Your transaction is protected by 256-bit SSL encryption</p>
+            </div>
+          </div>
+
+          {/* Method Tabs */}
+          <div className="bg-stone-100 p-2 rounded-2xl flex gap-2">
+            {(['card', 'upi', 'netbanking'] as const).map(m => (
+              <button key={m} onClick={() => setPaymentMethod(m)} className={`flex-1 py-4 text-base font-bold rounded-xl transition-all ${paymentMethod === m ? 'bg-rose-500 text-white shadow-lg scale-[1.02]' : 'text-stone-600 hover:bg-stone-200 hover:scale-100'}`}>
+                {m === 'card' ? '💳 Credit/Debit Card' : m === 'upi' ? '📱 UPI Options' : '🏦 Net Banking'}
+              </button>
+            ))}
+          </div>
+
+          <AnimatePresence mode="wait">
+            {paymentMethod === 'card' && (
+              <motion.div key="card" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-3xl border border-stone-200 p-8 space-y-6 shadow-sm">
+                {/* Card Preview */}
+                <div className="h-44 bg-gradient-to-br from-rose-500 via-pink-500 to-rose-700 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-10 translate-x-10" />
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-10 -translate-x-10" />
+                  <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-6">Credit / Debit Card</p>
+                  <p className="text-white text-lg font-mono tracking-widest mb-4">
+                    {cardData.number ? cardData.number.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}
+                  </p>
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-white/60 text-xs">Cardholder</p>
+                      <p className="text-white font-bold text-sm">{cardData.name || 'YOUR NAME'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/60 text-xs">Expires</p>
+                      <p className="text-white font-bold text-sm">{cardData.expiry || 'MM/YY'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-stone-600 mb-2">CARD NUMBER</label>
+                  <input type="text" maxLength={16} placeholder="1234 5678 9012 3456"
+                    className="w-full px-4 py-3 border-2 border-stone-200 rounded-xl focus:border-rose-400 outline-none font-mono"
+                    value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value.replace(/\D/g,'')})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-stone-600 mb-2">CARDHOLDER NAME</label>
+                  <input type="text" placeholder="John Doe"
+                    className="w-full px-4 py-3 border-2 border-stone-200 rounded-xl focus:border-rose-400 outline-none"
+                    value={cardData.name} onChange={e => setCardData({...cardData, name: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-600 mb-2">EXPIRY DATE</label>
+                    <input type="text" placeholder="MM/YY" maxLength={5}
+                      className="w-full px-4 py-3 border-2 border-stone-200 rounded-xl focus:border-rose-400 outline-none"
+                      value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-stone-600 mb-2">CVV</label>
+                    <input type="password" placeholder="•••" maxLength={4}
+                      className="w-full px-4 py-3 border-2 border-stone-200 rounded-xl focus:border-rose-400 outline-none"
+                      value={cardData.cvv} onChange={e => setCardData({...cardData, cvv: e.target.value})} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            {paymentMethod === 'upi' && (
+              <motion.div key="upi" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-2xl border-2 border-stone-100 p-6 space-y-5 shadow-sm">
+                <div className="text-center py-4">
+                  <div className="text-6xl mb-4">📱</div>
+                  <h3 className="font-bold text-stone-800 text-lg">Pay via UPI</h3>
+                  <p className="text-stone-500 text-sm">Enter your UPI ID to pay instantly</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-stone-600 mb-2">UPI ID</label>
+                  <input type="text" placeholder="yourname@upi"
+                    className="w-full px-4 py-3 border-2 border-stone-200 rounded-xl focus:border-rose-400 outline-none text-center font-mono text-lg"
+                    value={upiId} onChange={e => setUpiId(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {['GPay', 'PhonePe', 'Paytm'].map(app => (
+                    <button key={app} onClick={() => setUpiId(prev => prev.includes('@') ? prev : `${app.toLowerCase()}@ok`)}
+                      className="border-2 border-stone-200 rounded-xl py-3 text-sm font-bold text-stone-600 hover:border-rose-400 hover:text-rose-500 transition-all">
+                      {app}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+            {paymentMethod === 'netbanking' && (
+              <motion.div key="netbanking" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-2xl border-2 border-stone-100 p-6 space-y-5 shadow-sm">
+                <div className="text-center py-4">
+                  <div className="text-6xl mb-4">🏦</div>
+                  <h3 className="font-bold text-stone-800 text-lg">Net Banking</h3>
+                  <p className="text-stone-500 text-sm">Select your bank to continue</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'PNB'].map(b => (
+                    <button key={b} onClick={() => setBank(b)}
+                      className={`border-2 rounded-xl py-3 text-sm font-bold transition-all ${bank === b ? 'border-rose-500 bg-rose-50 text-rose-600' : 'border-stone-200 text-stone-600 hover:border-rose-300'}`}>
+                      {b} Bank
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Right: Order Summary */}
+        <div className="lg:col-span-5">
+          <div className="bg-white rounded-3xl border border-stone-200 p-8 shadow-sm lg:sticky top-24 space-y-6">
+            <h3 className="font-serif font-bold text-stone-900 text-2xl">Order Summary</h3>
+            <div className="flex gap-5 bg-stone-50 p-4 rounded-2xl border border-stone-100">
+              <img src={selectedVendor.img} alt={selectedVendor.name} className="w-20 h-20 rounded-xl object-cover shadow-sm" />
+              <div className="flex flex-col justify-center">
+                <p className="font-bold text-stone-900 text-lg leading-tight">{selectedVendor.name}</p>
+                <p className="text-stone-500 text-sm mt-1">{selectedVendor.category}</p>
+                <p className="text-rose-500 text-sm font-medium mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedVendor.location}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-stone-600">
+                <span>Base Price</span>
+                <span className="font-medium text-stone-900">₹{amount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-stone-600">
+                <span>Platform Booking Fee</span>
+                <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-sm">FREE</span>
+              </div>
+              <div className="flex justify-between items-center text-stone-600">
+                <span>GST (18%)</span>
+                <span className="font-medium text-stone-900">Included</span>
+              </div>
+            </div>
+
+            <div className="border-t-2 border-stone-100 pt-6 mt-6">
+              <div className="flex justify-between items-end mb-6">
+                <div>
+                  <span className="block font-bold text-stone-900 text-xl">Total Amount</span>
+                  <span className="text-stone-500 text-sm">Including all taxes</span>
+                </div>
+                <span className="font-bold text-rose-500 text-4xl">₹{amount.toLocaleString()}</span>
+              </div>
+
+              <motion.button onClick={handlePayment}
+                className="w-full bg-linear-to-r from-rose-500 to-pink-500 text-white py-4 rounded-2xl font-bold text-xl shadow-lg flex items-center justify-center gap-3 hover:shadow-rose-500/30 transition-shadow"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}>
+                <CreditCard className="w-6 h-6" />
+                Pay ₹{amount.toLocaleString()}
+              </motion.button>
+              
+              <div className="mt-4 flex items-center justify-center gap-2 text-stone-400 text-xs">
+                <Shield className="w-3 h-3" />
+                <p>By proceeding, you agree to our Terms & Conditions and Privacy Policy</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const PaymentsHistory = ({ user, setPage }: { user: UserData | null, setPage: (p: string) => void }) => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetch(`/api/payments/${user.id}`)
+        .then(r => r.json())
+        .then(data => { setPayments(Array.isArray(data) ? data : []); setLoading(false); })
+        .catch(() => setLoading(false));
+    }
+  }, [user]);
+
+  const total = payments.reduce((s, p) => s + p.amount, 0);
+
+  const methodIcon = (m: string) => m.includes('Card') ? '💳' : m === 'UPI' ? '📱' : '🏦';
+
+  return (
+    <motion.div className="max-w-4xl mx-auto px-4 py-12"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-3xl font-serif font-bold text-stone-800">Payment History</h2>
+          <p className="text-stone-500 text-sm mt-1">All your transactions in one place</p>
+        </div>
+        <button onClick={() => setPage('my-bookings')} className="text-rose-500 font-bold hover:underline text-sm">View Bookings</button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[
+          { label: 'Total Paid', value: `₹${total.toLocaleString()}`, icon: <DollarSign className="w-5 h-5" />, color: 'bg-rose-50 text-rose-600' },
+          { label: 'Transactions', value: payments.length.toString(), icon: <TrendingUp className="w-5 h-5" />, color: 'bg-blue-50 text-blue-600' },
+          { label: 'All Successful', value: '100%', icon: <Shield className="w-5 h-5" />, color: 'bg-emerald-50 text-emerald-600' },
+        ].map((s, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+            className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
+            <p className="text-2xl font-bold text-stone-800">{s.value}</p>
+            <p className="text-stone-500 text-sm">{s.label}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+            <CreditCard className="w-10 h-10 text-rose-400" />
+          </motion.div>
+        </div>
+      ) : payments.length === 0 ? (
+        <motion.div className="bg-white p-16 rounded-2xl border-2 border-dashed border-stone-200 text-center"
+          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <motion.div animate={{ y: [0, -6, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+            <CreditCard className="w-14 h-14 text-stone-300 mx-auto mb-4" />
+          </motion.div>
+          <h3 className="text-xl font-bold text-stone-600 mb-2">No Payments Yet</h3>
+          <p className="text-stone-400 mb-6">Your payment history will appear here after you book a vendor.</p>
+          <motion.button onClick={() => setPage('dashboard')}
+            className="bg-rose-500 text-white px-6 py-3 rounded-xl font-bold"
+            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            Browse Vendors
+          </motion.button>
+        </motion.div>
+      ) : (
+        <div className="space-y-4">
+          {payments.map((p, i) => (
+            <motion.div key={p.payment_id}
+              initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06, type: 'spring', damping: 20 }}
+              whileHover={{ x: 5, boxShadow: '0 8px 25px -5px rgba(0,0,0,0.1)' }}
+              className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center text-2xl">
+                    {methodIcon(p.method)}
+                  </div>
+                  <div>
+                    <p className="font-bold text-stone-800">{p.vendor_name}</p>
+                    <p className="text-stone-500 text-sm">{p.method}</p>
+                    <p className="text-stone-400 text-xs font-mono mt-0.5">TXN: {p.transaction_id}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-stone-800">₹{p.amount.toLocaleString()}</p>
+                  <div className="flex items-center gap-1.5 justify-end mt-1">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+                    <span className="text-emerald-600 text-xs font-bold uppercase">Success</span>
+                  </div>
+                  <p className="text-stone-400 text-xs mt-0.5 flex items-center gap-1 justify-end">
+                    <Clock className="w-3 h-3" />
+                    {new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 const BookingConfirmation = ({ bookingId, setPage }: { bookingId: number | null, setPage: (p: string) => void }) => {
+
   return (
     <motion.div 
       className="max-w-md mx-auto mt-20 p-12 bg-white rounded-3xl shadow-2xl border border-stone-100 text-center"
@@ -2241,8 +2610,12 @@ const MyBookings = ({ user, setPage }: { user: UserData | null, setPage: (p: str
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="text-stone-800 font-bold text-lg">₹{b.budget.toLocaleString()}</div>
-                  <motion.div className="text-emerald-500 text-xs flex items-center gap-1 justify-end font-medium" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-                    <CheckCircle className="h-3 w-3" /> Confirmed
+                  <motion.div
+                    className={`text-xs flex items-center gap-1 justify-end font-medium mt-0.5 ${b.payment_status === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+                    {b.payment_status === 'paid'
+                      ? <><CheckCircle className="h-3 w-3" /> Paid</>
+                      : <><CreditCard className="h-3 w-3" /> Payment Pending</>}
                   </motion.div>
                 </div>
                 <motion.button
@@ -2360,8 +2733,10 @@ export default function App() {
           {page === 'dashboard' && <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Dashboard user={user} setPage={setPage} setSelectedVendorObject={setSelectedVendorObject} favorites={favorites} toggleFavorite={toggleFavorite} /></motion.div>}
           {page === 'vendor-details' && <motion.div key="vendor-details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}><VendorDetails vendor={selectedVendorObject} setPage={setPage} user={user} favorites={favorites} toggleFavorite={toggleFavorite} /></motion.div>}
           {page === 'booking' && <motion.div key="booking" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}><BookingPage user={user} selectedVendor={selectedVendorObject} setPage={setPage} showMessage={showMessage} setLastBookingId={setLastBookingId} /></motion.div>}
+          {page === 'payment' && <motion.div key="payment" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}><PaymentPage user={user} selectedVendor={selectedVendorObject} bookingId={lastBookingId} setPage={setPage} showMessage={showMessage} /></motion.div>}
           {page === 'confirmation' && <motion.div key="confirmation" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}><BookingConfirmation bookingId={lastBookingId} setPage={setPage} /></motion.div>}
           {page === 'my-bookings' && <motion.div key="my-bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MyBookings user={user} setPage={setPage} /></motion.div>}
+          {page === 'payments' && <motion.div key="payments" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PaymentsHistory user={user} setPage={setPage} /></motion.div>}
           {page === 'budget' && <motion.div key="budget" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BudgetTracker user={user} setPage={setPage} showMessage={showMessage} /></motion.div>}
           {page === 'gallery' && <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PhotoGallery user={user} setPage={setPage} showMessage={showMessage} /></motion.div>}
           {page === 'profile' && <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}><Profile user={user} setUser={setUser} showMessage={showMessage} /></motion.div>}

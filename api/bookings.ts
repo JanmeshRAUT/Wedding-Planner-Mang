@@ -35,7 +35,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
       user_id: userId,
       vendor_name: vendorName,
       booking_date: date,
-      budget: budget
+      budget: budget,
+      payment_status: 'pending' // Added for Vercel
     };
     DEMO_DATA.bookings.push(booking);
     res.status(200).json({ success: true, bookingId: booking.booking_id });
