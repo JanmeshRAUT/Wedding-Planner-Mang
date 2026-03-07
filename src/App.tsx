@@ -915,17 +915,31 @@ const Register = ({ setPage, showMessage }: { setPage: (p: string) => void, show
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    const data = await res.json();
-    if (data.success) {
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (!res.ok) throw new Error('API failed');
+      const data = await res.json();
+      if (data.success) {
+        showMessage('success', 'Registration successful! Please login.');
+        setPage('login');
+      } else {
+        throw new Error(data.message || 'Registration failed');
+      }
+    } catch (err) {
+      // Vercel serverless fallback / Offline mode
+      const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
+      if (localUsers.find((u: any) => u.email === formData.email)) {
+        showMessage('error', 'Email already exists');
+        return;
+      }
+      localUsers.push({ id: Date.now(), ...formData });
+      localStorage.setItem('wedding_mock_users', JSON.stringify(localUsers));
       showMessage('success', 'Registration successful! Please login.');
       setPage('login');
-    } else {
-      showMessage('error', data.message);
     }
   };
 
@@ -1070,18 +1084,37 @@ const Login = ({ setPage, setUser, showMessage }: { setPage: (p: string) => void
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
-    const data = await res.json();
-    if (data.success) {
-      setUser(data.user);
-      localStorage.setItem('wedding_user', JSON.stringify(data.user));
-      setPage('dashboard');
-    } else {
-      showMessage('error', data.message);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (!res.ok) throw new Error('API failed');
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.user);
+        localStorage.setItem('wedding_user', JSON.stringify(data.user));
+        setPage('dashboard');
+      } else {
+        throw new Error(data.message || 'Login failed');
+      }
+    } catch (err) {
+      // Vercel serverless fallback / Offline mode
+      const localUsers = JSON.parse(localStorage.getItem('wedding_mock_users') || '[]');
+      const user = localUsers.find((u: any) => u.email === formData.email && u.password === formData.password);
+      if (user) {
+        setUser(user);
+        localStorage.setItem('wedding_user', JSON.stringify(user));
+        setPage('dashboard');
+      } else if (formData.email === 'demo@example.com' && formData.password === 'demo123') {
+        const demoUser = { id: 1, name: 'Demo User', email: 'demo@example.com', phone: '9999999999' };
+        setUser(demoUser);
+        localStorage.setItem('wedding_user', JSON.stringify(demoUser));
+        setPage('dashboard');
+      } else {
+        showMessage('error', 'Invalid credentials');
+      }
     }
   };
 

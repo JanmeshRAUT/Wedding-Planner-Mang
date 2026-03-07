@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Simple in-memory storage fallback.
+// Using global to persist across hot reloads or same-lambda executions in Vercel.
 const globalAny = global as any;
 if (!globalAny.weddingUsers) {
   globalAny.weddingUsers = {
@@ -18,14 +20,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
-    const { name, email, password, phone } = req.body;
-    if (globalAny.weddingUsers[email]) {
-      return res.status(400).json({ success: false, message: 'Email already exists' });
+    const { email, password } = req.body;
+    const user = globalAny.weddingUsers[email];
+    if (user && user.password === password) {
+      res.status(200).json({
+        success: true,
+        user: { id: user.id, name: user.name, email: user.email, phone: user.phone }
+      });
+    } else {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-    const newId = Object.keys(globalAny.weddingUsers).length + 1;
-    globalAny.weddingUsers[email] = { id: newId, name, email, password, phone };
-    res.status(200).json({ success: true, userId: newId });
   } else {
-    res.status(405).json({ success: false });
+    res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 }

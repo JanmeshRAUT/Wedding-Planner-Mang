@@ -1,11 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// In-memory storage (note: resets on deployment)
-const users: any[] = [];
-const bookings: any[] = [];
-const favorites: Map<string, number[]> = new Map();
-const budgetItems: any[] = [];
-const photoGallery: any[] = [];
+const globalAny = global as any;
+if (!globalAny.weddingUsers) {
+  globalAny.weddingUsers = {
+    'demo@example.com': { id: 1, name: 'Demo User', email: 'demo@example.com', password: 'demo123', phone: '9999999999' }
+  };
+}
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -14,37 +14,26 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
-  const { action } = req.query;
-
-  if (req.method === 'POST' && action === 'register') {
-    const { name, email, password, phone } = req.body;
-    const existingUser = users.find(u => u.email === email);
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Email already exists' });
-    }
-    const user = { id: users.length + 1, name, email, password, phone };
-    users.push(user);
-    res.status(200).json({ success: true, userId: user.id });
-  } else if (req.method === 'POST' && action === 'login') {
-    const { email, password } = req.body;
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-      res.status(200).json({ success: true, user: { id: user.id, name: user.name, email: user.email, phone: user.phone } });
-    } else {
-      res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-  } else if (req.method === 'PUT' && action === 'profile') {
-    const { id } = req.query;
+  if (req.method === 'PUT') {
+    const pathArray = (req.url || '').split('/').filter(p => p);
+    const id = pathArray.includes('users') ? pathArray[pathArray.indexOf('users') + 1] : req.query.id;
+    
     const { name, email, phone } = req.body;
-    const user = users.find(u => u.id === parseInt(id as string));
+    
+    // Find user by id
+    const usersList = Object.values(globalAny.weddingUsers) as any[];
+    let user = usersList.find((u: any) => u.id === parseInt(id as string, 10));
+    
     if (user) {
       user.name = name;
       user.email = email;
       user.phone = phone;
+      // Re-assign in case email changed
+      delete globalAny.weddingUsers[Object.keys(globalAny.weddingUsers).find(k => globalAny.weddingUsers[k].id === user.id)!];
+      globalAny.weddingUsers[email] = user;
       res.status(200).json({ success: true, user: { id: user.id, name: user.name, email: user.email, phone: user.phone } });
     } else {
       res.status(404).json({ success: false, message: 'User not found' });
